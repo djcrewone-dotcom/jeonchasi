@@ -64,20 +64,23 @@ def git_commit_and_push():
         print(f"[{datetime.now()}] Git 작업 중 오류: {e}")
 
 def main():
-    """스케줄러 메인 함수"""
-    print("전기차 데이터 크롤링 스케줄러 시작")
-    print("매일 오전 9시에 크롤링을 실행하고 GitHub에 자동 푸시합니다.")
+    """스케줄러 메인 함수 (GitHub Actions 사용으로 비활성화)"""
+    print("전기차 데이터 크롤링 스케줄러")
+    print("현재 GitHub Actions를 사용하여 서버에서 자동 크롤링을 실행합니다.")
+    print("로컬 스케줄러는 비활성화되었습니다.")
     
+    # GitHub Actions를 사용하므로 로컬 스케줄러는 비활성화
     # 매일 오전 9시에 크롤링 실행
-    schedule.every().day.at("09:00").do(run_crawler)
+    # schedule.every().day.at("09:00").do(run_crawler)
     
-    # 시작 시 한 번 실행 (선택사항)
-    # run_crawler()
+    # 수동 테스트를 위한 옵션
+    print("\n수동 테스트를 원하시면 아래 주석을 해제하세요:")
+    print("# run_crawler()")
     
-    # 스케줄러 실행
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # 1분마다 체크
+    # 스케줄러 실행 (비활성화됨)
+    # while True:
+    #     schedule.run_pending()
+    #     time.sleep(60)  # 1분마다 체크
 
 if __name__ == "__main__":
     main()

@@ -41,7 +41,14 @@ class ComprehensiveElectricVehicleCrawler:
         chrome_options.add_argument('--disable-images')
         
         try:
-            service = Service(ChromeDriverManager().install())
+            # GitHub Actions 환경에서 ChromeDriver 경로 설정
+            if os.environ.get('GITHUB_ACTIONS'):
+                # GitHub Actions 환경에서는 시스템에 설치된 ChromeDriver 사용
+                service = Service('/usr/local/bin/chromedriver')
+            else:
+                # 로컬 환경에서는 자동 다운로드
+                service = Service(ChromeDriverManager().install())
+            
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
@@ -598,3 +605,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
