@@ -345,7 +345,7 @@
             console.log('잔여대수 페이지 초기화');
             setupRemainingPageEventListeners();
             setupRemainingRegionButtons();
-            loadRemainingData();
+            loadRemainingData('승용', null);
         }
 
         // 잔여대수 페이지 이벤트 리스너 설정
@@ -471,8 +471,12 @@
             // 유형 버튼 생성
             setupRemainingTypeButtons();
             
-            // 데이터 표시 업데이트
-            updateRemainingDisplay();
+            // 선택된 차종 가져오기
+            const activeVehicleTypeButton = document.querySelector('#remaining-page .tab-button.active');
+            const selectedVehicleType = activeVehicleTypeButton ? activeVehicleTypeButton.getAttribute('data-vehicle-type') : '승용';
+            
+            // API를 통해 데이터 로드
+            loadRemainingData(selectedVehicleType, subRegion);
         }
 
         // 잔여대수 페이지 유형 버튼 설정
@@ -616,36 +620,59 @@
             updateRemainingDisplay();
         }
 
+        // 선택된 지역 가져오기
+        function getSelectedRemainingRegion() {
+            return currentRemainingSubRegion || currentRemainingRegion;
+        }
+
         // 차종구분 변경 처리
         function onRemainingVehicleTypeChange(vehicleType) {
             console.log('차종구분 변경:', vehicleType);
             currentRemainingBusType = ''; // 버스 유형 초기화
             setupRemainingTypeButtons();
-            updateRemainingDisplay();
+            
+            // 선택된 지역 가져오기
+            const selectedRegion = getSelectedRemainingRegion();
+            
+            // API를 통해 데이터 로드
+            loadRemainingData(vehicleType, selectedRegion);
         }
 
         // 잔여대수 데이터 로드
-        function loadRemainingData() {
+        function loadRemainingData(vehicleType = null, region = null) {
             showLoading(true);
             
-            // 서버 환경인지 파일 직접 접근인지 확인
-            const isServerEnvironment = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+            // API 호출을 위한 URL 구성
+            let apiUrl = '/api/remaining-data';
+            const params = new URLSearchParams();
             
-            if (isServerEnvironment) {
-                // 서버 환경에서는 fetch 사용
-                fetch('./data/subsidy_bus_order.csv')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('CSV 파일을 찾을 수 없습니다.');
-                        }
-                        return response.text();
-                    })
-                    .then(csvText => {
-                        window.remainingData = parseRemainingCSV(csvText);
-                        console.log('로드된 데이터:', window.remainingData);
-                        showLoading(false);
-                        updateRemainingDisplay();
-                    })
+            if (vehicleType) {
+                params.append('vehicle_type', vehicleType);
+            }
+            if (region) {
+                params.append('region', region);
+            }
+            
+            if (params.toString()) {
+                apiUrl += '?' + params.toString();
+            }
+            
+            console.log('API 호출:', apiUrl);
+            
+            // API에서 데이터 가져오기
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    window.remainingData = data;
+                    console.log('로드된 데이터:', window.remainingData);
+                    showLoading(false);
+                    updateRemainingDisplay();
+                })
                     .catch(error => {
                         console.error('데이터 로드 실패:', error);
                         showLoading(false);
