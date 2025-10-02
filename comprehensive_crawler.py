@@ -41,14 +41,8 @@ class ComprehensiveElectricVehicleCrawler:
         chrome_options.add_argument('--disable-images')
         
         try:
-            # GitHub Actions 환경에서 ChromeDriver 경로 설정
-            if os.environ.get('GITHUB_ACTIONS'):
-                # GitHub Actions 환경에서는 시스템에 설치된 ChromeDriver 사용
-                service = Service('/usr/local/bin/chromedriver')
-            else:
-                # 로컬 환경에서는 자동 다운로드
-                service = Service(ChromeDriverManager().install())
-            
+            # GitHub Actions 환경에서도 webdriver-manager 사용
+            service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
@@ -595,13 +589,32 @@ def main():
     print("승용 → 화물 → 승합 순으로 데이터를 추출합니다.")
     
     crawler = ComprehensiveElectricVehicleCrawler()
-    success = crawler.crawl_all_data()
     
-    if success:
-        crawler.save_to_csv()
-        print("크롤링 완료!")
-    else:
-        print("크롤링 실패!")
+    try:
+        success = crawler.crawl_all_data()
+        
+        if success:
+            save_success = crawler.save_to_csv()
+            if save_success:
+                print("크롤링 완료!")
+                return True
+            else:
+                print("CSV 저장 실패!")
+                return False
+        else:
+            print("크롤링 실패!")
+            return False
+            
+    except Exception as e:
+        print(f"메인 실행 중 오류: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+    
+    finally:
+        crawler.close()
+    
+    return True
 
 if __name__ == "__main__":
     main()

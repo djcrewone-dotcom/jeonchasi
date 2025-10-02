@@ -5,6 +5,11 @@ on:
     # 매일 한국시간 오전 9시에 실행 (UTC 00:00)
     - cron: '0 0 * * *'
   workflow_dispatch: # 수동 실행도 가능하도록 설정
+  push:
+    branches: [ main ]
+    paths:
+      - 'comprehensive_crawler.py'
+      - '.github/workflows/daily-crawler.yml'
 
 jobs:
   crawl-and-commit:
@@ -34,18 +39,42 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
         
-        # ChromeDriver 설치
-        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3 | cut -d'.' -f1)
-        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        # Chrome 버전 확인
+        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
+        echo "Chrome version: $CHROME_VERSION"
+        
+        # ChromeDriver 설치 (webdriver-manager 사용하도록 설정)
+        export CHROME_VERSION_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
+        echo "Chrome major version: $CHROME_VERSION_MAJOR"
+        
+        # ChromeDriver 다운로드 및 설치
+        CHROMEDRIVER_URL="https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION_MAJOR}"
+        echo "ChromeDriver URL: $CHROMEDRIVER_URL"
+        CHROMEDRIVER_VERSION=$(curl -s "$CHROMEDRIVER_URL")
+        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
+        
+        # ChromeDriver 다운로드
         wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
         sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
+        
+        # 설치 확인
+        echo "ChromeDriver 설치 확인:"
+        /usr/local/bin/chromedriver --version
     
     - name: Run crawler
       run: |
+        echo "크롤러 실행 시작..."
         python comprehensive_crawler.py
+        exit_code=$?
+        echo "크롤러 실행 완료. 종료 코드: $exit_code"
+        if [ $exit_code -ne 0 ]; then
+          echo "크롤러 실행 실패"
+          exit $exit_code
+        fi
       env:
         DISPLAY: ':99'
+        GITHUB_ACTIONS: 'true'
     
     - name: Configure Git
       run: |
