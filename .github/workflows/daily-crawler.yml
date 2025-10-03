@@ -55,13 +55,31 @@ jobs:
         CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
         echo "Chrome version: $CHROME_VERSION"
         
-        # ChromeDriver 120 버전 설치 (Chrome 버전에 관계없이 안정적인 버전 사용)
-        echo "ChromeDriver 120 버전 설치"
+        # ChromeDriver 버전 동적 확인 및 설치
+        echo "ChromeDriver 버전 동적 확인"
         
-        # ChromeDriver 120 다운로드 (안정적인 버전)
-        CHROMEDRIVER_VERSION="120.0.6099.109"
+        # Chrome 메이저 버전 추출
+        CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
+        echo "Chrome major version: $CHROME_MAJOR"
+        
+        # ChromeDriver 버전 확인 (여러 버전 시도)
+        CHROMEDRIVER_VERSION=""
+        for version in "119.0.6045.105" "118.0.5993.70" "117.0.5938.88" "116.0.5845.96"; do
+            echo "ChromeDriver 버전 $version 확인 중..."
+            if curl -s --head "https://chromedriver.storage.googleapis.com/${version}/chromedriver_linux64.zip" | head -n 1 | grep -q "200 OK"; then
+                CHROMEDRIVER_VERSION=$version
+                echo "사용 가능한 ChromeDriver 버전 발견: $CHROMEDRIVER_VERSION"
+                break
+            fi
+        done
+        
+        if [ -z "$CHROMEDRIVER_VERSION" ]; then
+            echo "사용 가능한 ChromeDriver 버전을 찾을 수 없습니다"
+            exit 1
+        fi
+        
         echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
-        echo "Chrome 버전: $CHROME_VERSION (ChromeDriver 120과 호환)"
+        echo "Chrome 버전: $CHROME_VERSION (ChromeDriver $CHROMEDRIVER_VERSION와 호환)"
         
         # ChromeDriver 다운로드
         wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
