@@ -43,13 +43,29 @@ jobs:
     
     - name: Install Chrome and ChromeDriver
       run: |
-        # Chrome 114 안정 버전 설치 (webdriver-manager와 호환성 보장)
+        # Chrome 114 안정 버전 강제 설치 (ChromeDriver 114와 호환성 보장)
         wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         
-        # Chrome 114 버전 설치 시도 (webdriver-manager가 잘 지원하는 버전)
-        sudo apt-get install -y google-chrome-stable=114.0.5735.198-1 || sudo apt-get install -y google-chrome-stable
+        # 기존 Chrome 제거
+        sudo apt-get remove -y google-chrome-stable || true
+        
+        # Chrome 114 버전 직접 다운로드 및 설치
+        echo "Chrome 114.0.5735.198 직접 다운로드 및 설치"
+        wget -O /tmp/chrome.deb "https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.198-1_amd64.deb"
+        
+        if [ -f /tmp/chrome.deb ]; then
+            echo "Chrome 114 다운로드 성공"
+            sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
+            echo "Chrome 114 설치 완료"
+        else
+            echo "Chrome 114 다운로드 실패, 최신 버전 설치"
+            sudo apt-get install -y google-chrome-stable
+        fi
+        
+        # Chrome 자동 업데이트 비활성화
+        sudo apt-mark hold google-chrome-stable
         
         # Chrome 버전 확인
         CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
