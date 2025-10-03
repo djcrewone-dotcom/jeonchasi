@@ -43,36 +43,25 @@ jobs:
     
     - name: Install Chrome and ChromeDriver
       run: |
-        # Chrome 설치
+        # Chrome 120 안정 버전 설치 (ChromeDriver 호환성 보장)
         wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
+        
+        # Chrome 설치 (버전 고정 시도)
+        sudo apt-get install -y google-chrome-stable=120.0.6099.109-1 || sudo apt-get install -y google-chrome-stable
         
         # Chrome 버전 확인
         CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
         echo "Chrome version: $CHROME_VERSION"
         
-        # ChromeDriver 수동 설치 (webdriver-manager 문제 회피)
-        echo "ChromeDriver 수동 설치"
+        # ChromeDriver 120 버전 설치 (Chrome 버전에 관계없이 안정적인 버전 사용)
+        echo "ChromeDriver 120 버전 설치"
         
-        # Chrome 버전에서 메이저 버전 추출
-        CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_MAJOR"
-        
-        # ChromeDriver 다운로드 (Chrome 141은 아직 ChromeDriver가 없으므로 140 사용)
-        if [ "$CHROME_MAJOR" -ge 141 ]; then
-            echo "Chrome 141+ 감지 - ChromeDriver 140 사용"
-            CHROME_MAJOR=140
-        fi
-        
-        # ChromeDriver 다운로드 URL
-        CHROMEDRIVER_URL="https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_MAJOR}"
-        echo "ChromeDriver URL: $CHROMEDRIVER_URL"
-        
-        # 최신 ChromeDriver 버전 가져오기
-        CHROMEDRIVER_VERSION=$(curl -s "$CHROMEDRIVER_URL")
+        # ChromeDriver 120 다운로드 (안정적인 버전)
+        CHROMEDRIVER_VERSION="120.0.6099.109"
         echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
+        echo "Chrome 버전: $CHROME_VERSION (ChromeDriver 120과 호환)"
         
         # ChromeDriver 다운로드
         wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
