@@ -41,23 +41,16 @@ class ComprehensiveElectricVehicleCrawler:
         chrome_options.add_argument('--disable-images')
         
         try:
-            # webdriver-manager 환경 변수 설정
-            import os
-            import shutil
-            os.environ['WDM_LOG_LEVEL'] = '0'  # 로그 레벨 낮춤
-            os.environ['WDM_LOCAL'] = '1'      # 로컬 캐시 사용
+            # GitHub Actions 환경에서는 수동 설치된 ChromeDriver 사용
+            if os.environ.get('GITHUB_ACTIONS'):
+                # 시스템에 설치된 ChromeDriver 사용
+                service = Service('/usr/local/bin/chromedriver')
+                print("GitHub Actions 환경 - 수동 설치된 ChromeDriver 사용")
+            else:
+                # 로컬 환경에서는 webdriver-manager 사용
+                service = Service(ChromeDriverManager().install())
+                print("로컬 환경 - webdriver-manager 사용")
             
-            # 기존 ChromeDriver 캐시 정리 (문제가 있는 파일 제거)
-            cache_dir = os.path.expanduser('~/.wdm')
-            if os.path.exists(cache_dir):
-                try:
-                    shutil.rmtree(cache_dir)
-                    print("기존 ChromeDriver 캐시 정리 완료")
-                except Exception as e:
-                    print(f"캐시 정리 중 오류: {e}")
-            
-            # GitHub Actions 환경에서도 webdriver-manager 사용
-            service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {
