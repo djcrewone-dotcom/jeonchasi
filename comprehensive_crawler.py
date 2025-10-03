@@ -43,8 +43,18 @@ class ComprehensiveElectricVehicleCrawler:
         try:
             # webdriver-manager 환경 변수 설정
             import os
+            import shutil
             os.environ['WDM_LOG_LEVEL'] = '0'  # 로그 레벨 낮춤
             os.environ['WDM_LOCAL'] = '1'      # 로컬 캐시 사용
+            
+            # 기존 ChromeDriver 캐시 정리 (문제가 있는 파일 제거)
+            cache_dir = os.path.expanduser('~/.wdm')
+            if os.path.exists(cache_dir):
+                try:
+                    shutil.rmtree(cache_dir)
+                    print("기존 ChromeDriver 캐시 정리 완료")
+                except Exception as e:
+                    print(f"캐시 정리 중 오류: {e}")
             
             # GitHub Actions 환경에서도 webdriver-manager 사용
             service = Service(ChromeDriverManager().install())
@@ -634,6 +644,17 @@ class ComprehensiveElectricVehicleCrawler:
                         
         except Exception as e:
             print(f"파일 정리 중 오류: {e}")
+
+    def close(self):
+        """크롤러 종료 시 리소스 정리"""
+        try:
+            if self.driver:
+                print("드라이버 종료 중...")
+                self.driver.quit()
+                self.driver = None
+                print("드라이버 종료 완료")
+        except Exception as e:
+            print(f"드라이버 종료 중 오류: {e}")
 
 def main():
     """메인 실행 함수"""

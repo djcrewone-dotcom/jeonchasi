@@ -57,6 +57,7 @@ jobs:
         echo "webdriver-manager를 사용하여 ChromeDriver 자동 설치"
         python -c "
         import os
+        import shutil
         os.environ['WDM_LOG_LEVEL'] = '0'  # 로그 레벨 낮춤
         os.environ['WDM_LOCAL'] = '1'      # 로컬 캐시 사용
         
@@ -64,6 +65,12 @@ jobs:
         from webdriver_manager.chrome import ChromeDriverManager
         
         try:
+            # 기존 ChromeDriver 캐시 정리
+            cache_dir = os.path.expanduser('~/.wdm')
+            if os.path.exists(cache_dir):
+                shutil.rmtree(cache_dir)
+                print('기존 ChromeDriver 캐시 정리 완료')
+            
             # ChromeDriver 자동 다운로드 및 설치
             driver_path = ChromeDriverManager().install()
             print(f'ChromeDriver 설치 완료: {driver_path}')
@@ -72,6 +79,11 @@ jobs:
             import stat
             os.chmod(driver_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
             print('ChromeDriver 실행 권한 설정 완료')
+            
+            # ChromeDriver 실행 테스트
+            import subprocess
+            result = subprocess.run([driver_path, '--version'], capture_output=True, text=True)
+            print(f'ChromeDriver 버전 확인: {result.stdout.strip()}')
             
         except Exception as e:
             print(f'ChromeDriver 설치 실패: {e}')
