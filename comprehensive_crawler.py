@@ -41,6 +41,11 @@ class ComprehensiveElectricVehicleCrawler:
         chrome_options.add_argument('--disable-images')
         
         try:
+            # webdriver-manager 환경 변수 설정
+            import os
+            os.environ['WDM_LOG_LEVEL'] = '0'  # 로그 레벨 낮춤
+            os.environ['WDM_LOCAL'] = '1'      # 로컬 캐시 사용
+            
             # GitHub Actions 환경에서도 webdriver-manager 사용
             service = Service(ChromeDriverManager().install())
             self.driver = webdriver.Chrome(service=service, options=chrome_options)

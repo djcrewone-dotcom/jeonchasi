@@ -43,24 +43,30 @@ jobs:
         CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
         echo "Chrome version: $CHROME_VERSION"
         
-        # ChromeDriver 설치 (webdriver-manager 사용하도록 설정)
-        export CHROME_VERSION_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_VERSION_MAJOR"
+        # ChromeDriver 설치 (webdriver-manager 사용)
+        echo "webdriver-manager를 사용하여 ChromeDriver 자동 설치"
+        python -c "
+        import os
+        os.environ['WDM_LOG_LEVEL'] = '0'  # 로그 레벨 낮춤
+        os.environ['WDM_LOCAL'] = '1'      # 로컬 캐시 사용
         
-        # ChromeDriver 다운로드 및 설치
-        CHROMEDRIVER_URL="https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION_MAJOR}"
-        echo "ChromeDriver URL: $CHROMEDRIVER_URL"
-        CHROMEDRIVER_VERSION=$(curl -s "$CHROMEDRIVER_URL")
-        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
+        from selenium.webdriver.chrome.service import Service
+        from webdriver_manager.chrome import ChromeDriverManager
         
-        # ChromeDriver 다운로드
-        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-        
-        # 설치 확인
-        echo "ChromeDriver 설치 확인:"
-        /usr/local/bin/chromedriver --version
+        try:
+            # ChromeDriver 자동 다운로드 및 설치
+            driver_path = ChromeDriverManager().install()
+            print(f'ChromeDriver 설치 완료: {driver_path}')
+            
+            # 실행 권한 부여
+            import stat
+            os.chmod(driver_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+            print('ChromeDriver 실행 권한 설정 완료')
+            
+        except Exception as e:
+            print(f'ChromeDriver 설치 실패: {e}')
+            exit(1)
+        "
     
     - name: Run crawler
       run: |
