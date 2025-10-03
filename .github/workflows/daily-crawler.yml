@@ -43,78 +43,68 @@ jobs:
     
     - name: Install Chrome and ChromeDriver
       run: |
-        # Chrome 120 안정 버전 설치 (ChromeDriver 호환성 보장)
+        # Chrome 114 안정 버전 설치 (webdriver-manager와 호환성 보장)
         wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         
-        # Chrome 설치 (버전 고정 시도)
-        sudo apt-get install -y google-chrome-stable=120.0.6099.109-1 || sudo apt-get install -y google-chrome-stable
+        # Chrome 114 버전 설치 시도 (webdriver-manager가 잘 지원하는 버전)
+        sudo apt-get install -y google-chrome-stable=114.0.5735.198-1 || sudo apt-get install -y google-chrome-stable
         
         # Chrome 버전 확인
         CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
         echo "Chrome version: $CHROME_VERSION"
         
-        # ChromeDriver 버전 동적 확인 및 설치
-        echo "ChromeDriver 버전 동적 확인"
+        # webdriver-manager를 사용한 ChromeDriver 설치
+        echo "webdriver-manager를 사용한 ChromeDriver 설치"
         
-        # Chrome 메이저 버전 추출
-        CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_MAJOR"
+        python -c "
+        import os
+        import sys
         
-        # ChromeDriver 버전 확인 (여러 저장소와 버전 시도)
-        CHROMEDRIVER_VERSION=""
-        CHROMEDRIVER_URL=""
+        # 환경 변수 설정
+        os.environ['WDM_LOG_LEVEL'] = '0'
+        os.environ['WDM_LOCAL'] = '1'
+        os.environ['WDM_SILENT'] = 'true'
         
-        # 새로운 ChromeDriver 저장소 시도 (Chrome 115+)
-        echo "새로운 ChromeDriver 저장소 확인 중..."
-        NEW_CHROMEDRIVER_URL="https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/115.0.5790.102/linux64/chromedriver-linux64.zip"
-        if curl -s --head "$NEW_CHROMEDRIVER_URL" | head -n 1 | grep -q "200 OK"; then
-            CHROMEDRIVER_VERSION="115.0.5790.102"
-            CHROMEDRIVER_URL="$NEW_CHROMEDRIVER_URL"
-            echo "새로운 저장소에서 ChromeDriver 발견: $CHROMEDRIVER_VERSION"
-        else
-            # 기존 저장소에서 오래된 버전들 시도
-            echo "기존 저장소에서 ChromeDriver 확인 중..."
-            for version in "114.0.5735.90" "113.0.5672.63" "112.0.5615.49" "111.0.5563.64" "110.0.5481.77"; do
-                echo "ChromeDriver 버전 $version 확인 중..."
-                if curl -s --head "https://chromedriver.storage.googleapis.com/${version}/chromedriver_linux64.zip" | head -n 1 | grep -q "200 OK"; then
-                    CHROMEDRIVER_VERSION=$version
-                    CHROMEDRIVER_URL="https://chromedriver.storage.googleapis.com/${version}/chromedriver_linux64.zip"
-                    echo "기존 저장소에서 ChromeDriver 발견: $CHROMEDRIVER_VERSION"
-                    break
-                fi
-            done
-        fi
-        
-        if [ -z "$CHROMEDRIVER_VERSION" ]; then
-            echo "사용 가능한 ChromeDriver 버전을 찾을 수 없습니다"
-            exit 1
-        fi
-        
-        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
-        echo "Chrome 버전: $CHROME_VERSION (ChromeDriver $CHROMEDRIVER_VERSION와 호환)"
-        
-        # ChromeDriver 다운로드
-        wget -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL"
-        
-        # 압축 해제
-        sudo unzip /tmp/chromedriver.zip -d /tmp/
-        
-        # ChromeDriver 실행 파일 찾기 및 설치
-        CHROMEDRIVER_FILE=$(find /tmp -name "chromedriver" -type f | head -1)
-        if [ -n "$CHROMEDRIVER_FILE" ]; then
-            echo "ChromeDriver 파일 발견: $CHROMEDRIVER_FILE"
-            sudo mv "$CHROMEDRIVER_FILE" /usr/local/bin/chromedriver
-            sudo chmod +x /usr/local/bin/chromedriver
-            echo "ChromeDriver 설치 완료"
+        try:
+            from webdriver_manager.chrome import ChromeDriverManager
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
             
-            # 버전 확인
-            /usr/local/bin/chromedriver --version
-        else
-            echo "ChromeDriver 실행 파일을 찾을 수 없습니다"
-            exit 1
-        fi
+            print('webdriver-manager로 ChromeDriver 설치 중...')
+            
+            # ChromeDriver 자동 설치
+            driver_path = ChromeDriverManager().install()
+            print(f'ChromeDriver 설치 완료: {driver_path}')
+            
+            # Chrome 옵션 설정
+            chrome_options = Options()
+            chrome_options.add_argument('--headless')
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--window-size=1920,1080')
+            
+            # ChromeDriver 테스트
+            service = Service(driver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # 간단한 테스트
+            driver.get('https://www.google.com')
+            title = driver.title
+            print(f'ChromeDriver 테스트 성공: {title}')
+            
+            driver.quit()
+            print('ChromeDriver 설치 및 테스트 완료')
+            
+        except Exception as e:
+            print(f'ChromeDriver 설치 실패: {e}')
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+        "
     
     - name: Run crawler
       run: |
