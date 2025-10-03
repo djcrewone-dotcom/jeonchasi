@@ -57,51 +57,66 @@ class ComprehensiveElectricVehicleCrawler:
         """지정된 버튼 클릭"""
         print(f"{button_text} 버튼 클릭 시도...")
         
-        # 여러 방법으로 버튼 찾기
-        selectors = [
-            f"//input[@value='{button_text}']",
-            f"//button[contains(text(), '{button_text}')]",
-            f"//a[contains(text(), '{button_text}')]",
-            f"//span[contains(text(), '{button_text}')]",
-            f"//div[contains(text(), '{button_text}')]",
-            f"//*[contains(text(), '{button_text}')]"
-        ]
-        
-        for selector in selectors:
-            try:
-                elements = self.driver.find_elements(By.XPATH, selector)
-                for element in elements:
-                    if element.is_displayed() and element.is_enabled():
-                        self.driver.execute_script("arguments[0].click();", element)
-                        print(f"{button_text} 버튼 클릭 성공: {selector}")
-                        time.sleep(3)
-                        return True
-            except Exception as e:
-                continue
-        
-        # JavaScript로 시도
         try:
-            js_code = f"""
-            var elements = document.querySelectorAll('*');
-            for (var i = 0; i < elements.length; i++) {{
-                var element = elements[i];
-                if (element.textContent && element.textContent.includes('{button_text}')) {{
-                    element.click();
-                    return true;
-                }}
-            }}
-            return false;
-            """
+            # 페이지 로딩 대기
+            time.sleep(2)
             
-            result = self.driver.execute_script(js_code)
-            if result:
-                print(f"JavaScript로 {button_text} 버튼 클릭 성공")
-                time.sleep(3)
-                return True
+            # 여러 방법으로 버튼 찾기
+            selectors = [
+                f"//input[@value='{button_text}']",
+                f"//button[contains(text(), '{button_text}')]",
+                f"//a[contains(text(), '{button_text}')]",
+                f"//span[contains(text(), '{button_text}')]",
+                f"//div[contains(text(), '{button_text}')]",
+                f"//*[contains(text(), '{button_text}')]"
+            ]
+            
+            for selector in selectors:
+                try:
+                    elements = self.driver.find_elements(By.XPATH, selector)
+                    for element in elements:
+                        if element.is_displayed() and element.is_enabled():
+                            # 스크롤하여 요소가 보이도록 함
+                            self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
+                            time.sleep(1)
+                            
+                            self.driver.execute_script("arguments[0].click();", element)
+                            print(f"{button_text} 버튼 클릭 성공: {selector}")
+                            time.sleep(3)
+                            return True
+                except Exception as e:
+                    print(f"셀렉터 {selector} 실패: {e}")
+                    continue
+            
+            # JavaScript로 시도
+            try:
+                js_code = f"""
+                var elements = document.querySelectorAll('*');
+                for (var i = 0; i < elements.length; i++) {{
+                    var element = elements[i];
+                    if (element.textContent && element.textContent.includes('{button_text}')) {{
+                        element.scrollIntoView(true);
+                        element.click();
+                        return true;
+                    }}
+                }}
+                return false;
+                """
+                
+                result = self.driver.execute_script(js_code)
+                if result:
+                    print(f"JavaScript로 {button_text} 버튼 클릭 성공")
+                    time.sleep(3)
+                    return True
+            except Exception as e:
+                print(f"JavaScript 클릭 실패: {e}")
+            
+            print(f"{button_text} 버튼을 찾을 수 없습니다")
+            return False
+            
         except Exception as e:
-            print(f"JavaScript 클릭 실패: {e}")
-        
-        return False
+            print(f"버튼 클릭 중 오류: {e}")
+            return False
 
     def convert_region_name(self, region_name):
         """지역명 변환 규칙 적용"""
@@ -142,54 +157,68 @@ class ComprehensiveElectricVehicleCrawler:
         print(f"{vehicle_type} 데이터 추출 시작...")
         
         try:
+            # 페이지 로딩 대기
+            time.sleep(3)
+            
             page_source = self.driver.page_source
             soup = BeautifulSoup(page_source, 'html.parser')
             
             # 테이블 찾기
             tables = soup.find_all('table')
             if not tables:
+                print(f"{vehicle_type} 테이블을 찾을 수 없습니다")
                 return []
             
             extracted_data = []
             current_region = None
             
-            for table in tables:
+            print(f"{vehicle_type} 테이블 {len(tables)}개 발견")
+            
+            for table_idx, table in enumerate(tables):
                 rows = table.find_all('tr')
+                print(f"테이블 {table_idx + 1}: {len(rows)}개 행")
                 
-                for row in rows:
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) < 5:
-                        continue
-                    
-                    row_text = ' '.join([cell.get_text(strip=True) for cell in cells])
-                    
-                    # 지역명 추출 (더 정확한 패턴 - 특별자치도 포함)
-                    region_match = re.search(r'([가-힣]+(?:시|도|구|군|특별시|광역시|특별자치시|특별자치도|환경공단))', row_text)
-                    if region_match:
-                        converted_region = self.convert_region_name(region_match.group(1))
-                        if converted_region:  # None이 아닌 경우만 사용
-                            current_region = converted_region
-                    
-                    # 각 차종별 데이터 추출
-                    if vehicle_type == "승용":
-                        data = self.extract_passenger_data(row_text, current_region)
-                    elif vehicle_type == "화물":
-                        data = self.extract_cargo_data(row_text, current_region)
-                    elif vehicle_type == "승합":
-                        # 승합 데이터에서 '초과' 관련 행만 제외하고 모든 행 처리
-                        if "초과" in row_text:
+                for row_idx, row in enumerate(rows):
+                    try:
+                        cells = row.find_all(['td', 'th'])
+                        if len(cells) < 5:
                             continue
-                        # 지역이 없어도 데이터 추출 시도 (extract_bus_data에서 지역 재추출)
-                        data = self.extract_bus_data(row_text, current_region)
-                    
-                    if data:
-                        extracted_data.extend(data)
+                        
+                        row_text = ' '.join([cell.get_text(strip=True) for cell in cells])
+                        
+                        # 지역명 추출 (더 정확한 패턴 - 특별자치도 포함)
+                        region_match = re.search(r'([가-힣]+(?:시|도|구|군|특별시|광역시|특별자치시|특별자치도|환경공단))', row_text)
+                        if region_match:
+                            converted_region = self.convert_region_name(region_match.group(1))
+                            if converted_region:  # None이 아닌 경우만 사용
+                                current_region = converted_region
+                        
+                        # 각 차종별 데이터 추출
+                        if vehicle_type == "승용":
+                            data = self.extract_passenger_data(row_text, current_region)
+                        elif vehicle_type == "화물":
+                            data = self.extract_cargo_data(row_text, current_region)
+                        elif vehicle_type == "승합":
+                            # 승합 데이터에서 '초과' 관련 행만 제외하고 모든 행 처리
+                            if "초과" in row_text:
+                                continue
+                            # 지역이 없어도 데이터 추출 시도 (extract_bus_data에서 지역 재추출)
+                            data = self.extract_bus_data(row_text, current_region)
+                        
+                        if data:
+                            extracted_data.extend(data)
+                            
+                    except Exception as e:
+                        print(f"행 {row_idx} 처리 중 오류: {e}")
+                        continue
             
             print(f"{vehicle_type} 데이터 {len(extracted_data)}개 추출 성공")
             return extracted_data
             
         except Exception as e:
             print(f"{vehicle_type} 데이터 추출 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def extract_passenger_data(self, row_text, region):
@@ -475,7 +504,9 @@ class ComprehensiveElectricVehicleCrawler:
 
     def crawl_all_data(self):
         """모든 차종 데이터 크롤링"""
+        print("크롤링 시작 - 드라이버 설정 중...")
         if not self.setup_driver():
+            print("드라이버 설정 실패")
             return False
         
         try:
@@ -483,6 +514,9 @@ class ComprehensiveElectricVehicleCrawler:
             print(f"페이지 접속: {url}")
             self.driver.get(url)
             time.sleep(5)
+            print("페이지 로딩 완료")
+            
+            success_count = 0
             
             # 전기승용 데이터 크롤링
             print("\n=== 전기승용 데이터 크롤링 ===")
@@ -490,6 +524,7 @@ class ComprehensiveElectricVehicleCrawler:
                 passenger_data = self.extract_data_from_page("승용")
                 self.all_data.extend(passenger_data)
                 print(f"전기승용 데이터 {len(passenger_data)}개 추출 완료")
+                success_count += 1
             else:
                 print("전기승용 버튼 클릭 실패")
             
@@ -499,6 +534,7 @@ class ComprehensiveElectricVehicleCrawler:
                 cargo_data = self.extract_data_from_page("화물")
                 self.all_data.extend(cargo_data)
                 print(f"전기화물 데이터 {len(cargo_data)}개 추출 완료")
+                success_count += 1
             else:
                 print("전기화물 버튼 클릭 실패")
             
@@ -508,14 +544,25 @@ class ComprehensiveElectricVehicleCrawler:
                 bus_data = self.extract_data_from_page("승합")
                 self.all_data.extend(bus_data)
                 print(f"전기승합 데이터 {len(bus_data)}개 추출 완료")
+                success_count += 1
             else:
                 print("전기승합 버튼 클릭 실패")
             
             print(f"\n총 {len(self.all_data)}개의 데이터 추출 완료")
-            return True
+            print(f"성공한 차종 수: {success_count}/3")
+            
+            # 최소한의 데이터라도 있으면 성공으로 처리
+            if len(self.all_data) > 0:
+                print("크롤링 성공 - 일부 데이터라도 추출됨")
+                return True
+            else:
+                print("크롤링 실패 - 추출된 데이터가 없음")
+                return False
                 
         except Exception as e:
             print(f"크롤링 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             if self.driver:

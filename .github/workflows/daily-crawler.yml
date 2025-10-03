@@ -65,9 +65,20 @@ jobs:
     - name: Run crawler
       run: |
         echo "크롤러 실행 시작..."
-        python comprehensive_crawler.py
+        echo "현재 디렉토리: $(pwd)"
+        echo "Python 버전: $(python --version)"
+        echo "파일 목록:"
+        ls -la
+        echo "data 디렉토리 확인:"
+        ls -la data/ || echo "data 디렉토리가 없습니다"
+        
+        python comprehensive_crawler.py 2>&1
         exit_code=$?
         echo "크롤러 실행 완료. 종료 코드: $exit_code"
+        
+        echo "실행 후 data 디렉토리 확인:"
+        ls -la data/ || echo "data 디렉토리가 없습니다"
+        
         if [ $exit_code -ne 0 ]; then
           echo "크롤러 실행 실패"
           exit $exit_code
