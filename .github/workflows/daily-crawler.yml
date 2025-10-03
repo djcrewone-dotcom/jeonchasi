@@ -58,11 +58,11 @@ jobs:
         # webdriver-manager를 사용한 ChromeDriver 자동 설치
         echo "webdriver-manager를 사용한 ChromeDriver 자동 설치"
         
-        python3 -c '
+        python3 -c "
 import os
 import sys
-os.environ["WDM_LOG_LEVEL"] = "0"
-os.environ["WDM_LOCAL"] = "1"
+os.environ['WDM_LOG_LEVEL'] = '0'
+os.environ['WDM_LOCAL'] = '1'
 
 try:
     from webdriver_manager.chrome import ChromeDriverManager
@@ -70,31 +70,31 @@ try:
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
     
-    print("webdriver-manager로 ChromeDriver 설치 중...")
+    print('webdriver-manager로 ChromeDriver 설치 중...')
     driver_path = ChromeDriverManager().install()
-    print(f"ChromeDriver 설치 완료: {driver_path}")
+    print(f'ChromeDriver 설치 완료: {driver_path}')
     
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--window-size=1920,1080')
     
     service = Service(driver_path)
     driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.get("https://www.google.com")
+    driver.get('https://www.google.com')
     title = driver.title
-    print(f"ChromeDriver 테스트 성공: {title}")
+    print(f'ChromeDriver 테스트 성공: {title}')
     driver.quit()
-    print("ChromeDriver 설치 및 테스트 완료")
+    print('ChromeDriver 설치 및 테스트 완료')
     
 except Exception as e:
-    print(f"ChromeDriver 설치 실패: {e}")
+    print(f'ChromeDriver 설치 실패: {e}')
     import traceback
     traceback.print_exc()
     sys.exit(1)
-'
+"
     
     - name: Run crawler
       run: |
