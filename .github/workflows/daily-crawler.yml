@@ -43,73 +43,58 @@ jobs:
     
     - name: Install Chrome and ChromeDriver
       run: |
-        # Chrome 114 안정 버전 강제 설치 (ChromeDriver 114와 호환성 보장)
+        # Chrome 최신 버전 설치
         wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         
-        # 기존 Chrome 제거
-        sudo apt-get remove -y google-chrome-stable || true
-        
-        # Chrome 114 버전 직접 다운로드 및 설치
-        echo "Chrome 114.0.5735.198 직접 다운로드 및 설치"
-        wget -O /tmp/chrome.deb "https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.198-1_amd64.deb"
-        
-        if [ -f /tmp/chrome.deb ]; then
-            echo "Chrome 114 다운로드 성공"
-            sudo dpkg -i /tmp/chrome.deb || sudo apt-get install -f -y
-            echo "Chrome 114 설치 완료"
-        else
-            echo "Chrome 114 다운로드 실패, 최신 버전 설치"
-            sudo apt-get install -y google-chrome-stable
-        fi
-        
-        # Chrome 자동 업데이트 비활성화
-        sudo apt-mark hold google-chrome-stable
+        # Chrome 최신 버전 설치
+        sudo apt-get install -y google-chrome-stable
         
         # Chrome 버전 확인
         CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
         echo "Chrome version: $CHROME_VERSION"
         
-        # ChromeDriver 직접 다운로드 및 설치 (webdriver-manager 문제 회피)
-        echo "ChromeDriver 직접 다운로드 및 설치"
+        # webdriver-manager를 사용한 ChromeDriver 자동 설치
+        echo "webdriver-manager를 사용한 ChromeDriver 자동 설치"
         
-        # Chrome 버전 확인
-        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3)
-        CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d'.' -f1)
-        echo "Chrome version: $CHROME_VERSION (major: $CHROME_MAJOR)"
-        
-        # ChromeDriver 다운로드 (Chrome 114 버전 고정)
-        echo "ChromeDriver 114.0.5735.90 다운로드 중..."
-        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip"
-        
-        if [ $? -eq 0 ]; then
-            echo "ChromeDriver 다운로드 성공"
-            
-            # 압축 해제
-            sudo unzip /tmp/chromedriver.zip -d /tmp/
-            
-            # ChromeDriver 실행 파일 찾기 및 설치
-            CHROMEDRIVER_FILE=$(find /tmp -name "chromedriver" -type f | head -1)
-            if [ -n "$CHROMEDRIVER_FILE" ]; then
-                echo "ChromeDriver 파일 발견: $CHROMEDRIVER_FILE"
-                sudo mv "$CHROMEDRIVER_FILE" /usr/local/bin/chromedriver
-                sudo chmod +x /usr/local/bin/chromedriver
-                echo "ChromeDriver 설치 완료"
-                
-                # 버전 확인
-                /usr/local/bin/chromedriver --version
-                
-                # ChromeDriver 테스트
-                python3 -c 'from selenium import webdriver; from selenium.webdriver.chrome.options import Options; from selenium.webdriver.chrome.service import Service; import sys; chrome_options = Options(); chrome_options.add_argument("--headless"); chrome_options.add_argument("--no-sandbox"); chrome_options.add_argument("--disable-dev-shm-usage"); chrome_options.add_argument("--disable-gpu"); chrome_options.add_argument("--window-size=1920,1080"); service = Service("/usr/local/bin/chromedriver"); driver = webdriver.Chrome(service=service, options=chrome_options); driver.get("https://www.google.com"); title = driver.title; print(f"ChromeDriver 테스트 성공: {title}"); driver.quit(); print("ChromeDriver 설치 및 테스트 완료")'
-            else
-                echo "ChromeDriver 실행 파일을 찾을 수 없습니다"
-                exit 1
-            fi
-        else
-            echo "ChromeDriver 다운로드 실패"
-            exit 1
-        fi
+        python3 -c '
+import os
+import sys
+os.environ["WDM_LOG_LEVEL"] = "0"
+os.environ["WDM_LOCAL"] = "1"
+
+try:
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    
+    print("webdriver-manager로 ChromeDriver 설치 중...")
+    driver_path = ChromeDriverManager().install()
+    print(f"ChromeDriver 설치 완료: {driver_path}")
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080")
+    
+    service = Service(driver_path)
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver.get("https://www.google.com")
+    title = driver.title
+    print(f"ChromeDriver 테스트 성공: {title}")
+    driver.quit()
+    print("ChromeDriver 설치 및 테스트 완료")
+    
+except Exception as e:
+    print(f"ChromeDriver 설치 실패: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+'
     
     - name: Run crawler
       run: |
