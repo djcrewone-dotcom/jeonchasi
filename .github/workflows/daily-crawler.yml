@@ -1,4 +1,4 @@
-name: Daily Electric Vehicle Data Crawler
+name: Daily Electric Vehicle Data Crawler - Fixed
 
 on:
   schedule:
