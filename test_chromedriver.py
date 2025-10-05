@@ -1,46 +1,139 @@
 #!/usr/bin/env python3
 """
-ChromeDriver 설치 및 테스트 스크립트
+ChromeDriver 수동 설치 및 테스트 스크립트
 """
 import os
 import sys
+import subprocess
+import requests
+import zipfile
+import shutil
+from pathlib import Path
 
-# webdriver-manager 환경 변수 설정
-os.environ['WDM_LOG_LEVEL'] = '0'
-os.environ['WDM_LOCAL'] = '1'
-os.environ['WDM_SILENT'] = 'true'
+def get_chrome_version():
+    """Chrome 버전 확인"""
+    try:
+        result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
+        version = result.stdout.strip().split()[-1]
+        major_version = version.split('.')[0]
+        print(f'Chrome 버전: {version} (메이저: {major_version})')
+        return version, major_version
+    except Exception as e:
+        print(f'Chrome 버전 확인 실패: {e}')
+        return None, None
 
-try:
-    from webdriver_manager.chrome import ChromeDriverManager
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
+def download_chromedriver(chrome_major):
+    """Chrome 메이저 버전에 맞는 ChromeDriver 다운로드"""
+    try:
+        # Chrome 141+ 버전에 대한 ChromeDriver 다운로드 URL
+        if int(chrome_major) >= 141:
+            # Chrome 141은 아직 ChromeDriver가 없으므로 140 사용
+            chrome_major = 140
+            print(f'Chrome {chrome_major}+ 버전 감지 - ChromeDriver {chrome_major} 사용')
+        
+        # ChromeDriver 다운로드 URL
+        chromedriver_url = f"https://chromedriver.storage.googleapis.com/LATEST_RELEASE_{chrome_major}"
+        
+        # 최신 ChromeDriver 버전 가져오기
+        response = requests.get(chromedriver_url)
+        if response.status_code != 200:
+            print(f'ChromeDriver 버전 확인 실패: {response.status_code}')
+            return None
+        
+        chromedriver_version = response.text.strip()
+        print(f'ChromeDriver 버전: {chromedriver_version}')
+        
+        # ChromeDriver 다운로드
+        download_url = f"https://chromedriver.storage.googleapis.com/{chromedriver_version}/chromedriver_linux64.zip"
+        print(f'ChromeDriver 다운로드 중: {download_url}')
+        
+        response = requests.get(download_url)
+        if response.status_code != 200:
+            print(f'ChromeDriver 다운로드 실패: {response.status_code}')
+            return None
+        
+        # 임시 파일로 저장
+        temp_zip = '/tmp/chromedriver.zip'
+        with open(temp_zip, 'wb') as f:
+            f.write(response.content)
+        
+        # 압축 해제
+        with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
+            zip_ref.extractall('/tmp/')
+        
+        # ChromeDriver 실행 파일 찾기
+        chromedriver_path = '/tmp/chromedriver'
+        if os.path.exists(chromedriver_path):
+            # 실행 권한 부여
+            os.chmod(chromedriver_path, 0o755)
+            print(f'ChromeDriver 설치 완료: {chromedriver_path}')
+            return chromedriver_path
+        else:
+            print('ChromeDriver 실행 파일을 찾을 수 없습니다')
+            return None
+            
+    except Exception as e:
+        print(f'ChromeDriver 다운로드 실패: {e}')
+        import traceback
+        traceback.print_exc()
+        return None
+
+def test_chromedriver(driver_path):
+    """ChromeDriver 테스트"""
+    try:
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+        
+        # Chrome 옵션 설정
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--window-size=1920,1080')
+        
+        # ChromeDriver 테스트
+        service = Service(driver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        driver.get('https://www.google.com')
+        title = driver.title
+        print(f'ChromeDriver 테스트 성공: {title}')
+        
+        driver.quit()
+        print('ChromeDriver 설치 및 테스트 완료')
+        return True
+        
+    except Exception as e:
+        print(f'ChromeDriver 테스트 실패: {e}')
+        import traceback
+        traceback.print_exc()
+        return False
+
+def main():
+    """메인 함수"""
+    print('ChromeDriver 수동 설치 시작...')
     
-    print('webdriver-manager로 ChromeDriver 설치 중...')
-    driver_path = ChromeDriverManager().install()
-    print(f'ChromeDriver 설치 완료: {driver_path}')
+    # Chrome 버전 확인
+    chrome_version, chrome_major = get_chrome_version()
+    if not chrome_version:
+        print('Chrome 버전을 확인할 수 없습니다')
+        sys.exit(1)
     
-    # Chrome 옵션 설정
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--window-size=1920,1080')
+    # ChromeDriver 다운로드
+    driver_path = download_chromedriver(chrome_major)
+    if not driver_path:
+        print('ChromeDriver 다운로드 실패')
+        sys.exit(1)
     
     # ChromeDriver 테스트
-    service = Service(driver_path)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    
-    driver.get('https://www.google.com')
-    title = driver.title
-    print(f'ChromeDriver 테스트 성공: {title}')
-    
-    driver.quit()
-    print('ChromeDriver 설치 및 테스트 완료')
-    
-except Exception as e:
-    print(f'ChromeDriver 설치 실패: {e}')
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+    if test_chromedriver(driver_path):
+        print('ChromeDriver 설치 및 테스트 성공')
+        sys.exit(0)
+    else:
+        print('ChromeDriver 테스트 실패')
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

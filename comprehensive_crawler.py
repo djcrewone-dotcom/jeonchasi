@@ -41,15 +41,28 @@ class ComprehensiveElectricVehicleCrawler:
         chrome_options.add_argument('--disable-images')
         
         try:
-            # webdriver-manager 환경 변수 설정
             import os
-            os.environ['WDM_LOG_LEVEL'] = '0'
-            os.environ['WDM_LOCAL'] = '1'
-            os.environ['WDM_SILENT'] = 'true'
             
-            # webdriver-manager를 사용하여 ChromeDriver 자동 관리
-            service = Service(ChromeDriverManager().install())
-            print("webdriver-manager로 ChromeDriver 자동 설치 및 사용")
+            # GitHub Actions 환경에서는 수동 설치된 ChromeDriver 사용
+            if os.environ.get('GITHUB_ACTIONS'):
+                chromedriver_path = '/tmp/chromedriver'
+                if os.path.exists(chromedriver_path):
+                    service = Service(chromedriver_path)
+                    print(f"GitHub Actions 환경: 수동 설치된 ChromeDriver 사용 - {chromedriver_path}")
+                else:
+                    # webdriver-manager 환경 변수 설정
+                    os.environ['WDM_LOG_LEVEL'] = '0'
+                    os.environ['WDM_LOCAL'] = '1'
+                    os.environ['WDM_SILENT'] = 'true'
+                    service = Service(ChromeDriverManager().install())
+                    print("webdriver-manager로 ChromeDriver 자동 설치 및 사용")
+            else:
+                # 로컬 환경에서는 webdriver-manager 사용
+                os.environ['WDM_LOG_LEVEL'] = '0'
+                os.environ['WDM_LOCAL'] = '1'
+                os.environ['WDM_SILENT'] = 'true'
+                service = Service(ChromeDriverManager().install())
+                print("로컬 환경: webdriver-manager로 ChromeDriver 자동 설치 및 사용")
             
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
