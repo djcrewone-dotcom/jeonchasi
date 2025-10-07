@@ -22,39 +22,65 @@ def get_chrome_version():
         print(f'Chrome 버전 확인 실패: {e}')
         return None, None
 
-def download_chromedriver(chrome_major):
-    """Chrome 메이저 버전에 맞는 ChromeDriver 다운로드 - 여러 버전 시도"""
+def download_chromedriver(chrome_version):
+    """Chrome 버전에 맞는 ChromeDriver 다운로드 - Chrome for Testing API 사용"""
     try:
-        # Chrome 141+ 버전에 대한 ChromeDriver 버전 목록 (최신부터 순서대로)
-        if int(chrome_major) >= 141:
-            chrome_major_list = [140, 139, 138, 137, 136, 135, 134, 133, 132, 131, 130]
-            print(f'Chrome {chrome_major} 버전 감지 - 여러 ChromeDriver 버전 시도')
-        else:
-            chrome_major_list = [chrome_major]
+        print(f'Chrome for Testing API를 사용하여 ChromeDriver 다운로드 시도...')
         
-        for chrome_major_to_try in chrome_major_list:
+        # Chrome for Testing API에서 사용 가능한 ChromeDriver 목록 가져오기
+        api_url = "https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+        
+        print(f'Chrome for Testing API 호출: {api_url}')
+        response = requests.get(api_url, timeout=30)
+        if response.status_code != 200:
+            print(f'Chrome for Testing API 호출 실패: {response.status_code}')
+            return None
+        
+        data = response.json()
+        versions = data.get('versions', [])
+        
+        # Chrome 버전과 호환되는 ChromeDriver 찾기
+        chrome_major = chrome_version.split('.')[0]
+        compatible_versions = []
+        
+        # 메이저 버전이 일치하는 ChromeDriver 찾기
+        for version_info in versions:
+            version = version_info.get('version', '')
+            downloads = version_info.get('downloads', {})
+            chromedriver_downloads = downloads.get('chromedriver', [])
+            
+            if version.startswith(chrome_major + '.') and chromedriver_downloads:
+                # Linux 64비트 ChromeDriver 다운로드 링크 찾기
+                for download in chromedriver_downloads:
+                    if download.get('platform') == 'linux64':
+                        compatible_versions.append({
+                            'version': version,
+                            'url': download.get('url')
+                        })
+                        break
+        
+        # 호환 버전을 버전 순으로 정렬 (최신부터)
+        compatible_versions.sort(key=lambda x: [int(v) for v in x['version'].split('.')], reverse=True)
+        
+        if not compatible_versions:
+            print(f'Chrome {chrome_major}과 호환되는 ChromeDriver를 찾을 수 없습니다')
+            return None
+        
+        print(f'발견된 호환 ChromeDriver 버전: {len(compatible_versions)}개')
+        
+        # 첫 번째 호환 버전 시도
+        for i, version_info in enumerate(compatible_versions[:3]):  # 최대 3개 버전 시도
             try:
-                print(f'ChromeDriver {chrome_major_to_try} 시도 중...')
+                version = version_info['version']
+                download_url = version_info['url']
                 
-                # ChromeDriver 다운로드 URL
-                chromedriver_url = f"https://chromedriver.storage.googleapis.com/LATEST_RELEASE_{chrome_major_to_try}"
-                
-                # 최신 ChromeDriver 버전 가져오기
-                response = requests.get(chromedriver_url, timeout=10)
-                if response.status_code != 200:
-                    print(f'ChromeDriver {chrome_major_to_try} 버전 확인 실패: {response.status_code}')
-                    continue
-                
-                chromedriver_version = response.text.strip()
-                print(f'ChromeDriver {chrome_major_to_try} 버전: {chromedriver_version}')
+                print(f'ChromeDriver {version} 시도 중... ({i+1}/3)')
+                print(f'다운로드 URL: {download_url}')
                 
                 # ChromeDriver 다운로드
-                download_url = f"https://chromedriver.storage.googleapis.com/{chromedriver_version}/chromedriver_linux64.zip"
-                print(f'ChromeDriver 다운로드 중: {download_url}')
-                
-                response = requests.get(download_url, timeout=30)
+                response = requests.get(download_url, timeout=60)
                 if response.status_code != 200:
-                    print(f'ChromeDriver {chrome_major_to_try} 다운로드 실패: {response.status_code}')
+                    print(f'ChromeDriver {version} 다운로드 실패: {response.status_code}')
                     continue
                 
                 # 임시 파일로 저장
@@ -66,19 +92,31 @@ def download_chromedriver(chrome_major):
                 with zipfile.ZipFile(temp_zip, 'r') as zip_ref:
                     zip_ref.extractall('/tmp/')
                 
-                # ChromeDriver 실행 파일 찾기
-                chromedriver_path = '/tmp/chromedriver'
-                if os.path.exists(chromedriver_path):
+                # ChromeDriver 실행 파일 찾기 (새로운 구조에서는 chromedriver-linux64/chromedriver)
+                possible_paths = [
+                    '/tmp/chromedriver',
+                    '/tmp/chromedriver-linux64/chromedriver',
+                    '/tmp/chromedriver_linux64/chromedriver'
+                ]
+                
+                chromedriver_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        chromedriver_path = path
+                        break
+                
+                if chromedriver_path:
                     # 실행 권한 부여
                     os.chmod(chromedriver_path, 0o755)
-                    print(f'ChromeDriver {chrome_major_to_try} 설치 완료: {chromedriver_path}')
+                    print(f'ChromeDriver {version} 설치 완료: {chromedriver_path}')
                     return chromedriver_path
                 else:
-                    print(f'ChromeDriver {chrome_major_to_try} 실행 파일을 찾을 수 없습니다')
+                    print(f'ChromeDriver {version} 실행 파일을 찾을 수 없습니다')
+                    print(f'시도한 경로: {possible_paths}')
                     continue
                     
             except Exception as e:
-                print(f'ChromeDriver {chrome_major_to_try} 시도 실패: {e}')
+                print(f'ChromeDriver {version} 시도 실패: {e}')
                 continue
         
         print('사용 가능한 ChromeDriver 버전을 찾을 수 없습니다')
@@ -133,8 +171,8 @@ def main():
         print('Chrome 버전을 확인할 수 없습니다')
         sys.exit(1)
     
-    # ChromeDriver 다운로드
-    driver_path = download_chromedriver(chrome_major)
+    # ChromeDriver 다운로드 (전체 버전 전달)
+    driver_path = download_chromedriver(chrome_version)
     if not driver_path:
         print('ChromeDriver 다운로드 실패')
         sys.exit(1)
